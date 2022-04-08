@@ -29,6 +29,7 @@ include = [
 
 [tool.poetry.dependencies]
 python = "^3.8"
+graphql-core = "^3.2.0"
 
 [tool.poetry.dev-dependencies]
 actions-toolkit = "^0.0.5"
