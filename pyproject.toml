@@ -1,0 +1,57 @@
+[tool.poetry]
+name = "python_graphql_compiler"
+version = "0.1.0"
+description = "Python graphql compiler"
+license = "MIT"
+authors = ["Shogo Sawai <shogo.sawai+graphqlcompiler@gmail.com>"]
+readme = "README.rst"
+homepage = "https://github.com/s1s5/python-graphql-compiler"
+repository = "https://github.com/s1s5/python-graphql-compiler"
+documentation = "https://s1s5.github.io/python-graphql-compiler/"
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+]
+include = [
+    "docs",
+    "tests",
+    "*.rst",
+    "LICENSE",
+]
+
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/s1s5/python-graphql-compiler/issues"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+
+[tool.poetry.dev-dependencies]
+actions-toolkit = "^0.0.5"
+black = "^21.5b0"
+bump2version = "^1.0.1"
+codecov = "^2.1.11"
+coverage = "^5.5"
+dunamai = "^1.5.5"
+flake8 = "^3.9.1"
+isort = "^5.8.0"
+mypy = "^0.812"
+pip-tools = "^6.1.0"
+pre-commit = "^2.12.1"
+pylint = "^2.8.2"
+pytest = "^6.2.4"
+pytest-cov = "^2.11.1"
+pytest-xdist = "^2.2.1"
+Sphinx = "^3.5.4"
+sphinx-autoapi = "^1.8.1"
+
+[tool.poetry.scripts]
+python_graphql_compiler = "python_graphql_compiler.cli:main"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
