@@ -25,27 +25,42 @@ from .renderer import Renderer
 from .types import Config
 from .utils import build_client_schema
 
-context_settings = dict(help_option_names=["-h", "--help"])
 
 DEFAULT_CONFIG: Config = {
     "output_path": "{dirname}/{basename_without_ext}.py",
     "scalar_map": {
         "Date": {
             "import": "import datetime",
-            "value": "datetime.date",
+            "json_type": "str",
+            "python_type": "datetime.date",
+            "serializer": "{value}.isoformat()",
+            "deserializer": "datetime.date.fromisoformat({value})",
         },
         "DateTime": {
             "import": "import datetime",
-            "value": "datetime.datetime",
+            "json_type": "str",
+            "python_type": "datetime.datetime",
+            "serializer": "{value}.isoformat()",
+            "deserializer": "datetime.datetime.fromisoformat({value})",
         },
         "Time": {
             "import": "import datetime",
-            "value": "datetime.time",
+            "json_type": "str",
+            "python_type": "datetime.time",
+            "serializer": "{value}.isoformat()",
+            "deserializer": "datetime.time.fromisoformat({value})",
+        },
+        "UUID": {
+            "import": "import uuid",
+            "json_type": "str",
+            "python_type": "uuid.UUID",
+            "serializer": "str({value})",
+            "deserializer": "uuid.UUID({value})",
         },
     },
     "query_ext": "graphql",
-    "output_type": "dataclass",
 }
+
 
 def run(
     schema: GraphQLSchema,
@@ -54,7 +69,7 @@ def run(
 ) -> None:
     query_parser = Parser(schema)
     query_renderer = Renderer(
-        scalar_map=config["scalar_map"], render_as_typed_dict=config["output_type"] == "typeddict"
+        scalar_map=config["scalar_map"],
     )
 
     operation_library: Dict[str, List[OperationDefinitionNode]] = defaultdict(list)
@@ -83,7 +98,10 @@ def run(
             basename = os.path.basename(filename)
             basename_without_ext, ext = os.path.splitext(basename)
             dst_path = config["output_path"].format(
-                dirname=dirname, basename=basename, basename_without_ext=basename_without_ext, ext=ext
+                dirname=dirname,
+                basename=basename,
+                basename_without_ext=basename_without_ext,
+                ext=ext,
             )
             os.makedirs(os.path.dirname(dst_path), exist_ok=True)
             with open(dst_path, "w") as fp:
@@ -103,7 +121,9 @@ def compile_schema_library(schema_filepaths: Optional[List[str]]) -> GraphQLSche
                 data=json.dumps({"query": get_introspection_query()}),
             )
             res.raise_for_status()
-            full_schema = full_schema + print_schema(build_client_schema(res.json()["data"]))
+            full_schema = full_schema + print_schema(
+                build_client_schema(res.json()["data"])
+            )
         else:
             with open(schema_filepath) as schema_file:
                 full_schema = full_schema + schema_file.read()
@@ -123,7 +143,9 @@ def extract_query_files(queries: Optional[List[str]], config: Config) -> List[st
             if os.path.isfile(f_or_d):
                 results.add(f_or_d)
             if os.path.isdir(f_or_d):
-                results.update(glob.glob(os.path.join(f_or_d, f'**/*.{config["query_ext"]}')))
+                results.update(
+                    glob.glob(os.path.join(f_or_d, f'**/*.{config["query_ext"]}'))
+                )
     return list(results)
 
 
@@ -135,34 +157,31 @@ def load_config_file(config_file: Optional[str]) -> Config:
     return config
 
 
-
-@click.group(context_settings=context_settings)
-@click.option("-s",
-        "--schema",
-        help="the graphql schemas storage path or url",
-        type=str,
-        nargs="+",)
-@click.option(    "-q",
-        "--query",
-        help="path where query file or directory all queries files are stored",
-        type=str,
-        nargs="+",)
-@click.option("-t",
-        "--output-type",
-        help="output_type 'dataclass' or 'TypedDict'",
-                choices=["dataclass", "typeddict"],
-        default=None,)
+@click.command()
 @click.option(
-    "-c", "--config", help="path where config yaml file", type=str
+    "-s",
+    "--schema",
+    help="the graphql schemas storage path or url",
+    type=str,
+    multiple=True,
 )
+@click.option(
+    "-q",
+    "--query",
+    help="path where query file or directory all queries files are stored",
+    type=str,
+    multiple=True,
+)
+@click.option("-c", "--config", help="path where config yaml file", type=str)
 @click.version_option(python_graphql_compiler.__version__, "--version")
-def cli(schema: List[str], query: List[str], output_type: Optional[Literal["dataclass", "typeddict"]], config: Optional[str]):
+def cli(
+    schema: List[str],
+    query: List[str],
+    config: Optional[str],
+):
     compiled_schema = compile_schema_library(schema)
     config_data = load_config_file(config)
     query_files = extract_query_files(query, config_data)
-
-    if output_type is not None:
-        config_data["output_type"] = output_type
 
     run(
         schema=compiled_schema,

@@ -88,7 +88,9 @@ NodeT = Union[ParsedField, ParsedQuery]
 
 
 class FieldToTypeMatcherVisitor(Visitor):
-    def __init__(self, schema: GraphQLSchema, type_info: TypeInfo, query: OperationDefinitionNode):
+    def __init__(
+        self, schema: GraphQLSchema, type_info: TypeInfo, query: OperationDefinitionNode
+    ):
         super().__init__()
         self.schema = schema
         self.type_info = type_info
@@ -130,7 +132,6 @@ class FieldToTypeMatcherVisitor(Visitor):
             self.parsed.variable_map[key] = ParsedQueryVariable(
                 is_undefinedable=is_undefinedable, type_node=variable.type
             )
-
         self.parsed.name = node.name.value if node.name else ""
         self.push(self.parsed)
         return node
@@ -187,9 +188,14 @@ class FieldToTypeMatcherVisitor(Visitor):
         field = ParsedField(node=node, name=name, type=type_info, interface=current)
         stripped_type_info = strip_output_type_attribute(type_info)
 
-        if isinstance(stripped_type_info, (GraphQLObjectType, GraphQLInterfaceType, GraphQLUnionType)):
+        if isinstance(
+            stripped_type_info,
+            (GraphQLObjectType, GraphQLInterfaceType, GraphQLUnionType),
+        ):
             type_name = "__".join([x.name for x in self.dfs_path] + [name])
-            self.parsed.type_name_mapping[type_name] = self.get_available_typename(stripped_type_info)
+            self.parsed.type_name_mapping[type_name] = self.get_available_typename(
+                stripped_type_info
+            )
             stripped_type_info.name = type_name
             self.parsed.type_map[type_name] = field
 
@@ -220,9 +226,14 @@ class FieldToTypeMatcherVisitor(Visitor):
 
         field = ParsedField(node=node, name=name, type=type_info)
 
-        if isinstance(stripped_type_info, (GraphQLObjectType, GraphQLInterfaceType, GraphQLUnionType)):
+        if isinstance(
+            stripped_type_info,
+            (GraphQLObjectType, GraphQLInterfaceType, GraphQLUnionType),
+        ):
             type_name = "__".join([x.name for x in self.dfs_path] + [name])
-            self.parsed.type_name_mapping[type_name] = self.get_available_typename(stripped_type_info)
+            self.parsed.type_name_mapping[type_name] = self.get_available_typename(
+                stripped_type_info
+            )
             stripped_type_info.name = type_name
             self.parsed.type_map[type_name] = field
         elif isinstance(stripped_type_info, GraphQLEnumType):
@@ -234,7 +245,10 @@ class FieldToTypeMatcherVisitor(Visitor):
 
     def leave_field(self, node: FieldNode, *_):
         if isinstance(self.current, ParsedField):
-            if self.current.inline_fragments and "__typename" not in self.current.fields:
+            if (
+                self.current.inline_fragments
+                and "__typename" not in self.current.fields
+            ):
                 raise Exception("must add field '__typename' in inline fragment")
         self.pop()
         return node
@@ -252,7 +266,10 @@ class Parser:
         self.schema = schema
 
     def parse(
-        self, query: OperationDefinitionNode, full_fragments: str = "", should_validate: bool = True
+        self,
+        query: OperationDefinitionNode,
+        full_fragments: str = "",
+        should_validate: bool = True,
     ) -> ParsedQuery:
         type_info = TypeInfo(self.schema)
         visitor = FieldToTypeMatcherVisitor(self.schema, type_info, query)
