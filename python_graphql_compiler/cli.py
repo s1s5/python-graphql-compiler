@@ -1,11 +1,9 @@
-import argparse
 import glob
 import json
 import os
-import sys
 
 from collections import defaultdict
-from typing import Dict, List, Literal, Optional, Set
+from typing import Dict, List, Optional, Set
 
 import click
 import requests
@@ -25,40 +23,36 @@ from .renderer import Renderer
 from .types import Config
 from .utils import build_client_schema
 
-
 DEFAULT_CONFIG: Config = {
     "output_path": "{dirname}/{basename_without_ext}.py",
     "scalar_map": {
         "Date": {
             "import": "import datetime",
-            "json_type": "str",
             "python_type": "datetime.date",
             "serializer": "{value}.isoformat()",
             "deserializer": "datetime.date.fromisoformat({value})",
         },
         "DateTime": {
             "import": "import datetime",
-            "json_type": "str",
             "python_type": "datetime.datetime",
             "serializer": "{value}.isoformat()",
             "deserializer": "datetime.datetime.fromisoformat({value})",
         },
         "Time": {
             "import": "import datetime",
-            "json_type": "str",
             "python_type": "datetime.time",
             "serializer": "{value}.isoformat()",
             "deserializer": "datetime.time.fromisoformat({value})",
         },
         "UUID": {
             "import": "import uuid",
-            "json_type": "str",
             "python_type": "uuid.UUID",
             "serializer": "str({value})",
             "deserializer": "uuid.UUID({value})",
         },
     },
     "query_ext": "graphql",
+    "inherit": [],
 }
 
 
@@ -70,6 +64,7 @@ def run(
     query_parser = Parser(schema)
     query_renderer = Renderer(
         scalar_map=config["scalar_map"],
+        inherit=config["inherit"],
     )
 
     operation_library: Dict[str, List[OperationDefinitionNode]] = defaultdict(list)
@@ -77,7 +72,7 @@ def run(
 
     rules = [rule for rule in specified_rules if rule is not NoUnusedFragmentsRule]
     for filename in query_files:
-        with open(filename, "r") as fp:
+        with open(filename, "r", encoding="utf-8") as fp:
             parsed_query = parse(fp.read())
         errors = validate(schema, parsed_query, rules)
         if errors:
@@ -121,9 +116,7 @@ def compile_schema_library(schema_filepaths: Optional[List[str]]) -> GraphQLSche
                 data=json.dumps({"query": get_introspection_query()}),
             )
             res.raise_for_status()
-            full_schema = full_schema + print_schema(
-                build_client_schema(res.json()["data"])
-            )
+            full_schema = full_schema + print_schema(build_client_schema(res.json()["data"]))
         else:
             with open(schema_filepath) as schema_file:
                 full_schema = full_schema + schema_file.read()
@@ -143,9 +136,7 @@ def extract_query_files(queries: Optional[List[str]], config: Config) -> List[st
             if os.path.isfile(f_or_d):
                 results.add(f_or_d)
             if os.path.isdir(f_or_d):
-                results.update(
-                    glob.glob(os.path.join(f_or_d, f'**/*.{config["query_ext"]}'))
-                )
+                results.update(glob.glob(os.path.join(f_or_d, f'**/*.{config["query_ext"]}')))
     return list(results)
 
 
@@ -191,7 +182,8 @@ def cli(
 
 
 def main():
-    cli()
+    # pylint: disable=no-value-for-parameter
+    cli()  # noqa
 
 
 if __name__ == "__main__":

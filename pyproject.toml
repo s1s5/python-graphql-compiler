@@ -40,8 +40,7 @@ codecov = "^2.1.11"
 coverage = "^5.5"
 dunamai = "^1.5.5"
 flake8 = "^3.9.1"
-isort = "^5.8.0"
-mypy = "^0.812"
+isort = {extras = ["pyproject"], version = "^5.10.1"}
 pip-tools = "^6.1.0"
 pre-commit = "^2.12.1"
 pylint = "^2.8.2"
@@ -50,6 +49,14 @@ pytest-cov = "^2.11.1"
 pytest-xdist = "^2.2.1"
 Sphinx = "^3.5.4"
 sphinx-autoapi = "^1.8.1"
+radon = "^5.1.0"
+strawberry-graphql = {extras = ["debug-server"], version = "^0.105.0"}
+requests = "^2.27.1"
+types-requests = "^2.27.16"
+mypy = "^0.942"
+aiohttp = "^3.8.1"
+pytest-asyncio = "^0.18.3"
+types-PyYAML = "^6.0.5"
 
 [tool.poetry.scripts]
 python_graphql_compiler = "python_graphql_compiler.cli:main"
@@ -57,3 +64,28 @@ python_graphql_compiler = "python_graphql_compiler.cli:main"
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+line_length = 110
+multi_line_output = 3
+include_trailing_comma = true
+profile = "black"
+extend_skip_glob = ["**/migrations/*.py"]
+lines_between_types = 1
+
+[tool.flake8]
+max-line-length = 110
+max-complexity = 18
+extend-ignore = "E203,"
+radon-max-cc = 10
+
+[tool.black]
+line-length = 110
+
+[tool.mypy]
+namespace_packages = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
+testpaths = ["python_graphql_compiler", "tests", "docs"]

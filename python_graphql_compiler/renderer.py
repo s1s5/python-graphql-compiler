@@ -1,8 +1,9 @@
-import functools
-import os
 import copy
-from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, OrderedDict, Set, Tuple, Union
+import functools
+import inspect
+
+from dataclasses import dataclass, field
+from typing import Callable, Dict, List, Optional, Set, Union
 from xmlrpc.client import boolean
 
 from graphql import (
@@ -13,13 +14,10 @@ from graphql import (
     ListTypeNode,
     NamedTypeNode,
     NonNullTypeNode,
-    OperationType,
     TypeNode,
 )
-import graphql
 
-from .render_util import write_file_header, write_typed_dict
-
+from .code_chunk import CodeChunk
 from .parser import (
     GraphQLOutputType,
     ParsedField,
@@ -27,8 +25,8 @@ from .parser import (
     ParsedQueryVariable,
     strip_output_type_attribute,
 )
-from .types import ScalarConfig
-from .code_chunk import CodeChunk
+from .render_util import write_file_header, write_typed_dict
+from .types import InheritConfig, ScalarConfig
 
 DEFAULT_SCALAR_CONFIG: Dict[str, ScalarConfig] = {
     "Int": {"python_type": "int", "deserializer": "int({value})"},
@@ -51,6 +49,7 @@ class FieldInfo:
     scalar_config: Optional[ScalarConfig]
     serializer: Optional[str] = None
     deserializer: Optional[str] = None
+    demangle: List[str] = field(default_factory=list)
 
     @property
     def need_custom_init(self) -> bool:
@@ -74,33 +73,45 @@ class DefaultAssignConverter:
 @dataclass
 class ObjectAssignConverter:
     field_type_str: str
+    demangle: List[str]
 
     def __call__(self, varname: str) -> str:
-        return f"{self.field_type_str}(**{varname})"
+
+        if self.demangle:
+            arg = f"**demangle({varname}, {self.demangle})"
+        else:
+            arg = f"**{varname}"
+        return f"{self.field_type_str}({arg})"
 
 
 @dataclass
 class InlineFragmentAssignConverter:
     field_name: str
     field_type_str: str
+    demangle: List[str]
 
     def __call__(self, varname: str) -> str:
-        return (
-            f'__{self.field_name}_map.get({varname}["__typename"]'
-            f", {self.field_type_str})(**{varname})"
-        )
+        if self.demangle:
+            arg = f"**demangle({varname}, {self.demangle})"
+        else:
+            arg = f"**{varname}"
+        return f'__{self.field_name}_map.get({varname}["__typename"]' + f", {self.field_type_str})({arg})"
 
 
 class Renderer:
+    scalar_map: Dict[str, ScalarConfig]
+    use_demangle: bool
+
     def __init__(
         self,
         scalar_map: Dict[str, ScalarConfig] = {},
-        extra_import: str = "",
+        inherit: List[InheritConfig] = [],
     ) -> None:
         self.scalar_map = copy.deepcopy(DEFAULT_SCALAR_CONFIG)
         self.scalar_map.update(scalar_map)
         self.__extra_import: Set[str] = set()
-        self.extra_import = extra_import
+        self.inherit = inherit
+        self.use_demangle = False
 
     def render(
         self,
@@ -108,11 +119,16 @@ class Renderer:
     ) -> str:
         buffer = CodeChunk()
         write_file_header(buffer)
-        buffer.write("import typing")
+        buffer.write("import copy")
         buffer.write("import inspect")
+        buffer.write("import typing")
 
-        if self.extra_import:
-            buffer.write(self.extra_import)
+        buffer.write("from dataclasses import dataclass")
+        inherit_imports = set(inherit["import"] for inherit in self.inherit if "import" in inherit)
+        for im in inherit_imports:
+            buffer.write(im)
+        inherits_base = ", ".join([inherit["inherit"] for inherit in self.inherit])
+
         import_pos = buffer.tell()
         self.__extra_import.clear()
         rendered = set()
@@ -124,6 +140,7 @@ class Renderer:
                     rendered.add(enum_name)
                     self.render_enum(buffer, enum_name, enum_type)
                     wrote = True
+                    self.scalar_map[enum_name] = {"python_type": enum_name}
         if wrote:
             buffer.insert(_start, ["", "", "#" * 80, "# enum"])
 
@@ -163,17 +180,36 @@ class Renderer:
 
             buffer.write("")
             buffer.write("")
-            with buffer.write_block(f"class {query.name}:"):
-                buffer.write(f"Response: typing.TypeAlias = {query.name}Response")
-                buffer.write(f"Input: typing.TypeAlias = _{query.name}Input")
+            inherits = inherits_base.format(Input=f"_{query.name}Input", Response=f"{query.name}Response")
+            if inherits:
+                inherits = f"({inherits})"
+            with buffer.write_block(f"class {query.name}{inherits}:"):
                 with buffer.write_block("_query = inspect.cleandoc('''"):
                     buffer.write_lines(self.get_query_body(query).splitlines())
                 buffer.write("''')")
+                buffer.write(f"Input: typing.TypeAlias = _{query.name}Input")
+                buffer.write(f"Response: typing.TypeAlias = {query.name}Response")
 
                 self.write_serialize(buffer, query)
                 self.write_deserialize(buffer, query)
 
+        if self.use_demangle:
+            buffer.insert(
+                import_pos,
+                inspect.cleandoc(
+                    """
+            def demangle(data, attrs):
+                data = copy.copy(data)
+                for attr in attrs:
+                    data[attr[1:]] = data.pop(attr)
+                return data
+            """
+                ).splitlines(),
+            )
+            buffer.insert(import_pos, ["", ""])
+
         buffer.insert(import_pos, [x for x in sorted(self.__extra_import) if x])
+
         return str(buffer)
 
     def get_query_body(self, query: ParsedQuery) -> str:
@@ -195,6 +231,7 @@ class Renderer:
                 if self.is_scalar_type(field_value.type)
                 else None
             ),
+            demangle=list(set(x.name for x in field_value.fields.values() if x.name.startswith("__"))),
         )
 
     def get_field_type_mapping(
@@ -253,12 +290,8 @@ class Renderer:
         isnull=True,
     ):
         if isinstance(field_type, GraphQLNonNull):
-            return self.get_assign_field_str(
-                buffer, field_name, field_type.of_type, converter, isnull=False
-            )
-        elif isinstance(field_type, GraphQLList) and not self.is_scalar_type(
-            field_type
-        ):
+            return self.get_assign_field_str(buffer, field_name, field_type.of_type, converter, isnull=False)
+        elif isinstance(field_type, GraphQLList) and not self.is_scalar_type(field_type):
             item_assign = self.get_assign_field_str(
                 buffer, f"{field_name}__iter", field_type.of_type, converter
             )
@@ -282,9 +315,7 @@ class Renderer:
             return self.get_assign_field_str_type_node(
                 buffer, field_name, field_type.type, converter, isnull=False
             )
-        elif isinstance(
-            field_type, ListTypeNode
-        ) and not self.is_scalar_type_from_node_type(field_type):
+        elif isinstance(field_type, ListTypeNode) and not self.is_scalar_type_from_node_type(field_type):
             item_assign = self.get_assign_field_str_type_node(
                 buffer, f"{field_name}__iter", field_type.type, converter
             )
@@ -313,9 +344,7 @@ class Renderer:
 
                 buffer.write(f"{field_name}: {field_info.python_type}")
 
-            if functools.reduce(
-                lambda x, y: x or y.need_custom_init, field_mapping.values(), False
-            ):
+            if functools.reduce(lambda x, y: x or y.need_custom_init, field_mapping.values(), False):
                 self.render_class_init(buffer, parsed_field, field_mapping)
 
     def render_class_init(
@@ -324,41 +353,38 @@ class Renderer:
         parsed_field: Union[ParsedField, ParsedQuery],
         field_mapping: Dict[str, FieldInfo],
     ):
-        init_args = ", ".join([field_name for field_name in field_mapping])
+        init_args = ", ".join(
+            [field_name[1:] if field_name.startswith("__") else field_name for field_name in field_mapping]
+        )
         with buffer.write_block(f"def __init__(self, {init_args}):"):
             for field_name, field_info in field_mapping.items():
-                org_field_name = field_name
                 if field_name.startswith("__"):
                     field_name = field_name[1:]
 
-                field_type_str = self.type_to_string(
-                    field_info.graphql_type, type_only=True
-                )
-                if (
-                    field_name in parsed_field.fields
-                    and parsed_field.fields[field_name].inline_fragments
-                ):
+                field_type_str = self.type_to_string(field_info.graphql_type, type_only=True)
+                converter: Callable[[str], str]
+                if field_name in parsed_field.fields and parsed_field.fields[field_name].inline_fragments:
                     with buffer.write_block(f"__{field_name}_map = {'{'}"):
-                        for t, pf in parsed_field.fields[
-                            field_name
-                        ].inline_fragments.items():
+                        for t, pf in parsed_field.fields[field_name].inline_fragments.items():
                             buffer.write(f'"{t}": {pf.type.name},')
                     buffer.write(f'{"}"}')
                     converter = InlineFragmentAssignConverter(
-                        field_name=field_name, field_type_str=field_type_str
+                        field_name=field_name,
+                        field_type_str=field_type_str,
+                        demangle=field_info.demangle,
                     )
+                    self.use_demangle = self.use_demangle or bool(field_info.demangle)
                 elif not field_info.is_scalar:
-                    converter = ObjectAssignConverter(field_type_str=field_type_str)
-                elif field_info.scalar_config:
-                    converter = DefaultAssignConverter(
-                        field_info.scalar_config.get("deserializer")
+                    converter = ObjectAssignConverter(
+                        field_type_str=field_type_str, demangle=field_info.demangle
                     )
+                    self.use_demangle = self.use_demangle or bool(field_info.demangle)
+                elif field_info.scalar_config:
+                    converter = DefaultAssignConverter(field_info.scalar_config.get("deserializer"))
                 else:
                     raise Exception("Unexpected Error")
 
-                assign = self.get_assign_field_str(
-                    buffer, org_field_name, field_info.graphql_type, converter
-                )
+                assign = self.get_assign_field_str(buffer, field_name, field_info.graphql_type, converter)
                 buffer.write(f"self.{field_name} = {assign}")
 
     def get_scalar_config_from_type(self, type_: GraphQLOutputType) -> ScalarConfig:
@@ -399,9 +425,7 @@ class Renderer:
                 return s
             else:
                 return f"typing.List[{s}]"  # type: ignore
-        type_name = self.scalar_map.get(
-            type_.name, {"import": "", "python_type": type_.name}
-        )
+        type_name = self.scalar_map.get(type_.name, {"import": "", "python_type": type_.name})
         self.__extra_import.add(type_name.get("import") or "")
         if isnull and (not type_only):
             return f"typing.Optional[{type_name['python_type']}]"
@@ -413,18 +437,14 @@ class Renderer:
         elif isinstance(node, NonNullTypeNode):
             return self.type_node_to_string(node.type, isnull=False)
         elif isinstance(node, NamedTypeNode):
-            type_name = self.scalar_map.get(
-                node.name.value, {"import": "", "python_type": node.name.value}
-            )
+            type_name = self.scalar_map.get(node.name.value, {"import": "", "python_type": node.name.value})
             self.__extra_import.add(type_name.get("import") or "")
             if isnull:
                 return f"typing.Optional[{type_name['python_type']}]"
             return type_name["python_type"]
         raise Exception("Unknown type node")  # pragma: no cover
 
-    def render_input(
-        self, buffer: CodeChunk, name: str, input_type: GraphQLInputObjectType
-    ):
+    def render_input(self, buffer: CodeChunk, name: str, input_type: GraphQLInputObjectType):
         # TODO: コード共通化
         r: List[str] = []
         nr: List[str] = []
@@ -439,7 +459,7 @@ class Renderer:
         write_typed_dict(buffer, name, r, nr)
         buffer.write("")
         buffer.write("")
-        with buffer.write_block(f"def {name}__serialize(self, data):"):
+        with buffer.write_block(f"def {name}__serialize(data):"):
             buffer.write("ret = copy.copy(data)")
             for key, pqv in input_type.fields.items():
                 type_: GraphQLOutputType = pqv.type  # type: ignore
@@ -447,13 +467,9 @@ class Renderer:
                 scalar_config = self.get_scalar_config_from_type(type_)
                 if (not is_scalar) or scalar_config.get("serializer"):
                     if is_scalar:
-                        converter = DefaultAssignConverter(
-                            scalar_config.get("deserializer")
-                        )
+                        converter = DefaultAssignConverter(scalar_config.get("deserializer"))
                     else:
-                        converter = DefaultAssignConverter(
-                            f"{name}__serialize" + "({value})"
-                        )
+                        converter = DefaultAssignConverter(f"{name}__serialize" + "({value})")
                     assign = self.get_assign_field_str(buffer, "x", type_, converter)
                     statement = f'ret["{key}"] = {assign}'
                     if pqv.is_undefinedable:
@@ -481,23 +497,19 @@ class Renderer:
 
         buffer.write("")
         buffer.write("")
-        with buffer.write_block(f"def {name}__serialize(self, data):"):
+        with buffer.write_block(f"def {name}__serialize(data):"):
             buffer.write("ret = copy.copy(data)")
             for key, pqv in variable_map.items():
                 is_scalar = self.is_scalar_type_from_node_type(pqv.type_node)
                 scalar_config = self.get_scalar_config_from_type_node(pqv.type_node)
                 if (not is_scalar) or scalar_config.get("serializer"):
                     if is_scalar:
-                        converter = DefaultAssignConverter(
-                            scalar_config.get("deserializer")
-                        )
+                        converter = DefaultAssignConverter(scalar_config.get("deserializer"))
                     else:
                         converter = DefaultAssignConverter(
                             f'{scalar_config["python_type"]}__serialize' + "({value})"
                         )
-                    assign = self.get_assign_field_str_type_node(
-                        buffer, "x", pqv.type_node, converter
-                    )
+                    assign = self.get_assign_field_str_type_node(buffer, "x", pqv.type_node, converter)
                     statement = f'ret["{key}"] = {assign}'
                     if pqv.is_undefinedable:
                         with buffer.write_block(f"if {key} in data:"):
@@ -511,7 +523,7 @@ class Renderer:
     def write_serialize(self, buffer: CodeChunk, query: ParsedQuery):
         buffer.write("")
         buffer.write("@classmethod")
-        with buffer.write_block(f"def serialize(cls, data: {query.name}Input):"):
+        with buffer.write_block(f"def serialize(cls, data: _{query.name}Input):"):
             with buffer.write_block("return {"):
                 buffer.write(f'"operation_name": "{query.name}",')
                 buffer.write('"query": cls._query,')
@@ -521,5 +533,5 @@ class Renderer:
     def write_deserialize(self, buffer: CodeChunk, query: ParsedQuery):
         buffer.write("")
         buffer.write("@classmethod")
-        with buffer.write_block(f"def deserialize(cls, data):"):
+        with buffer.write_block("def deserialize(cls, data):"):
             buffer.write("return cls.Response(**data)")

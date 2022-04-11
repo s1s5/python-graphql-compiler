@@ -3,10 +3,7 @@ import re
 from graphql import GraphQLSchema, IntrospectionQuery
 from graphql import build_client_schema as build_client_schema_orig
 from graphql.pyutils import inspect
-from graphql.utilities.get_introspection_query import (
-    DirectiveLocation,
-    IntrospectionDirective,
-)
+from graphql.utilities.get_introspection_query import DirectiveLocation, IntrospectionDirective
 
 __all__ = ["build_client_schema"]
 
@@ -14,8 +11,7 @@ __all__ = ["build_client_schema"]
 INCLUDE_DIRECTIVE_JSON: IntrospectionDirective = {
     "name": "include",
     "description": (
-        "Directs the executor to include this field or fragment "
-        "only when the `if` argument is true."
+        "Directs the executor to include this field or fragment " "only when the `if` argument is true."
     ),
     "locations": [
         DirectiveLocation.FIELD,
@@ -38,10 +34,7 @@ INCLUDE_DIRECTIVE_JSON: IntrospectionDirective = {
 
 SKIP_DIRECTIVE_JSON: IntrospectionDirective = {
     "name": "skip",
-    "description": (
-        "Directs the executor to skip this field or fragment "
-        "when the `if` argument is true."
-    ),
+    "description": ("Directs the executor to skip this field or fragment " "when the `if` argument is true."),
     "locations": [
         DirectiveLocation.FIELD,
         DirectiveLocation.FRAGMENT_SPREAD,
@@ -75,9 +68,7 @@ def build_client_schema(introspection: IntrospectionQuery) -> GraphQLSchema:
         outside gql.
     """
 
-    if not isinstance(introspection, dict) or not isinstance(
-        introspection.get("__schema"), dict
-    ):
+    if not isinstance(introspection, dict) or not isinstance(introspection.get("__schema"), dict):
         raise TypeError(
             "Invalid or incomplete introspection result. Ensure that you"
             " are passing the 'data' attribute of an introspection response"
