@@ -2,14 +2,10 @@ from .code_chunk import CodeChunk
 from typing import List
 
 
-def write_typed_dict(
-    buffer: CodeChunk, name: str, required: List[str], optional: List[str]
-):
+def write_typed_dict(buffer: CodeChunk, name: str, required: List[str], optional: List[str]):
     buffer.write("")
     buffer.write("")
-    buffer.write(
-        f'{name}__required = typing.TypedDict("{name}__required", {"{"}{", ".join(required)}{"}"})'
-    )
+    buffer.write(f'{name}__required = typing.TypedDict("{name}__required", {"{"}{", ".join(required)}{"}"})')
     buffer.write(
         f'{name}__not_required = typing.TypedDict("{name}__not_required", '
         f'{"{"}{", ".join(optional)}{"}"}, total=False)'
@@ -25,4 +21,5 @@ def write_file_header(buffer: CodeChunk) -> None:
     buffer.write("# flake8: noqa")
     buffer.write("# fmt: off")
     buffer.write("# isort: skip_file")
+    buffer.write("# pylint: skip-file")
     buffer.write("")

@@ -1,0 +1,78 @@
+query GetScalar {
+  hello
+}
+
+query GetObject($id: ID!) {
+  droid(id: $id) {
+    __typename
+    id name appearsIn primaryFunction
+  }
+}
+
+query GetInterface($e: Episode!) {
+  hero(episode: $e) {
+    id name
+  }
+}
+
+query GetInlineFragment($e: Episode!) {
+  hero(episode: $e) {
+    __typename id name
+    ... on Human { totalCredits }
+    ... on Droid { primaryFunction }
+  }
+}
+
+query GetCustomScalar {
+  today
+}
+
+query GetUnion($text: String!) {
+  search(text: $text) {
+    __typename
+    ... on Human { totalCredits }
+    ... on Droid { friends { name } }
+    ... on Starship { name }
+  }
+}
+
+query GetRecursive($episode: Episode!) {
+  hero(episode: $episode) {
+    __typename
+    name
+    ... on Human {
+      friends {
+        __typename
+        ... on Human { name }
+        ... on Droid { id name }
+      }
+    }
+    ... on Droid {
+      primaryFunction
+      friends {
+        __typename
+        id
+        ... on Human {
+          name
+          starships { name }
+        }
+        ... on Droid {
+          name
+          friends { name }
+        }
+      }
+    }
+  }
+}
+
+mutation AddStarship($input: AddStarshipInput!) {
+  addStarship(input: $input) {
+    id name
+  }
+}
+
+subscription AllHuman {
+  allHuman {
+    id name
+  }
+}
