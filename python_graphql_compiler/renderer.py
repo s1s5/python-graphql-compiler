@@ -15,6 +15,7 @@ from graphql import (
     NamedTypeNode,
     NonNullTypeNode,
     TypeNode,
+    Undefined,
 )
 
 from .code_chunk import CodeChunk
@@ -78,10 +79,10 @@ class ObjectAssignConverter:
     def __call__(self, varname: str) -> str:
 
         if self.demangle:
-            arg = f"**demangle({varname}, {self.demangle})"
+            arg = f"demangle({varname}, {self.demangle})"
         else:
-            arg = f"**{varname}"
-        return f"{self.field_type_str}({arg})"
+            arg = varname
+        return f"{self.field_type_str}(**{arg})"
 
 
 @dataclass
@@ -92,10 +93,10 @@ class InlineFragmentAssignConverter:
 
     def __call__(self, varname: str) -> str:
         if self.demangle:
-            arg = f"**demangle({varname}, {self.demangle})"
+            arg = f"demangle({varname}, {self.demangle})"
         else:
-            arg = f"**{varname}"
-        return f'__{self.field_name}_map.get({varname}["__typename"]' + f", {self.field_type_str})({arg})"
+            arg = varname
+        return f'__{self.field_name}_map.get({varname}["__typename"]' + f", {self.field_type_str})(**{arg})"
 
 
 class Renderer:
@@ -338,7 +339,7 @@ class Renderer:
 
         buffer.write("@dataclass")
         with buffer.write_block(f"class {name}:"):
-            for field_name, field_info in field_mapping.items():
+            for field_name, field_info in sorted(field_mapping.items()):
                 if field_name.startswith("__"):
                     field_name = field_name[1:]
 
@@ -354,10 +355,13 @@ class Renderer:
         field_mapping: Dict[str, FieldInfo],
     ):
         init_args = ", ".join(
-            [field_name[1:] if field_name.startswith("__") else field_name for field_name in field_mapping]
+            [
+                field_name[1:] if field_name.startswith("__") else field_name
+                for field_name in sorted(field_mapping)
+            ]
         )
         with buffer.write_block(f"def __init__(self, {init_args}):"):
-            for field_name, field_info in field_mapping.items():
+            for field_name, field_info in sorted(field_mapping.items()):
                 if field_name.startswith("__"):
                     field_name = field_name[1:]
 
@@ -472,7 +476,8 @@ class Renderer:
                         converter = DefaultAssignConverter(f"{name}__serialize" + "({value})")
                     assign = self.get_assign_field_str(buffer, "x", type_, converter)
                     statement = f'ret["{key}"] = {assign}'
-                    if pqv.is_undefinedable:
+
+                    if pqv.default_value != Undefined:
                         with buffer.write_block(f"if {key} in data:"):
                             buffer.write(f'x = data["{key}"]')
                             buffer.write(statement)

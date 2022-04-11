@@ -197,12 +197,24 @@ class Test(unittest.TestCase):
                     pass
 
 
+                def SubInput__serialize(data):
+                    ret = copy.copy(data)
+                    return ret
+
+
                 AddInput__required = typing.TypedDict("AddInput__required", {"name": str})
                 AddInput__not_required = typing.TypedDict("AddInput__not_required", {"sub": typing.Optional[SubInput]}, total=False)
 
 
                 class AddInput(AddInput__required, AddInput__not_required):
                     pass
+
+
+                def AddInput__serialize(data):
+                    ret = copy.copy(data)
+                    x = data["sub"]
+                    ret["sub"] = AddInput__serialize(x) if x else None
+                    return ret
                 """  # noqa
             ),
         )
@@ -286,7 +298,7 @@ class Test(unittest.TestCase):
         )
         self.assertEqual(
             assign,
-            "[Friend(**rewrite_typename(friends__iter))"
+            "[Friend(**demangle(friends__iter, ['__typename']))"
             " if friends__iter else None for friends__iter in friends]",
         )
 
@@ -324,19 +336,19 @@ class Test(unittest.TestCase):
                 """
                 @dataclass
                 class Hero:
-                    name: str
+                    _typename: typing.Literal["Character", "Droid", "Human"]
                     bestFriend: typing.Optional[Q__hero__bestFriend]
                     friends: typing.List[typing.Optional[Q__hero__friends]]
-                    _typename: typing.Literal["Character", "Droid", "Human"]
-                    def __init__(self, name, bestFriend, friends, _typename):
-                        self.name = name
-                        self.bestFriend = Q__hero__bestFriend(**rewrite_typename(bestFriend)) if bestFriend else None
+                    name: str
+                    def __init__(self, _typename, bestFriend, friends, name):
+                        self._typename = _typename
+                        self.bestFriend = Q__hero__bestFriend(**bestFriend) if bestFriend else None
                         __friends_map = {
                             "Human": Q__hero__friends__Human,
                             "Droid": Q__hero__friends__Droid,
                         }
-                        self.friends = [__friends_map.get(friends__iter["__typename"], Q__hero__friends)(**rewrite_typename(friends__iter)) if friends__iter else None for friends__iter in friends]
-                        self._typename = _typename
+                        self.friends = [__friends_map.get(friends__iter["__typename"], Q__hero__friends)(**demangle(friends__iter, ['__typename'])) if friends__iter else None for friends__iter in friends]
+                        self.name = name
                 """  # noqa
             ),
         )
@@ -411,6 +423,11 @@ class Test(unittest.TestCase):
 
                 class V(V__required, V__not_required):
                     pass
+
+
+                def V__serialize(data):
+                    ret = copy.copy(data)
+                    return ret
                 """  # noqa
             ),
         )
