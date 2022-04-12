@@ -118,6 +118,8 @@ class Renderer:
         self,
         parsed_query_list: List[ParsedQuery],
     ) -> str:
+        self.use_demangle = False
+
         buffer = CodeChunk()
         write_file_header(buffer)
         buffer.write("import copy")
