@@ -480,7 +480,7 @@ class Renderer:
                     statement = f'ret["{key}"] = {assign}'
 
                     if pqv.default_value != Undefined:
-                        with buffer.write_block(f"if {key} in data:"):
+                        with buffer.write_block(f'if "{key}" in data:'):
                             buffer.write(f'x = data["{key}"]')
                             buffer.write(statement)
                     else:
