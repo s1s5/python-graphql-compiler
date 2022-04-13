@@ -273,6 +273,15 @@ class Renderer:
             return True
         return type_.name in self.scalar_map
 
+    def unwrap_type(self, type_: GraphQLOutputType) -> str:
+        if isinstance(type_, GraphQLNonNull):
+            return self.unwrap_type(type_.of_type)
+        elif isinstance(type_, GraphQLList):
+            return self.unwrap_type(type_.of_type)
+        elif isinstance(type_, GraphQLEnumType):
+            return type_.name
+        return type_.name
+
     def is_scalar_type_from_node_type(self, type_: TypeNode) -> bool:
         if isinstance(type_, NonNullTypeNode):
             return self.is_scalar_type_from_node_type(type_.type)
@@ -280,6 +289,15 @@ class Renderer:
             return self.is_scalar_type_from_node_type(type_.type)
         elif isinstance(type_, NamedTypeNode):
             return type_.name.value in self.scalar_map
+        raise Exception("Unknown type node")  # pragma: no cover
+
+    def unwrap_type_node(self, type_: TypeNode) -> str:
+        if isinstance(type_, NonNullTypeNode):
+            return self.unwrap_type_node(type_.type)
+        elif isinstance(type_, ListTypeNode):
+            return self.unwrap_type_node(type_.type)
+        elif isinstance(type_, NamedTypeNode):
+            return type_.name.value
         raise Exception("Unknown type node")  # pragma: no cover
 
     def get_assign_field_str(
@@ -292,7 +310,7 @@ class Renderer:
     ):
         if isinstance(field_type, GraphQLNonNull):
             return self.get_assign_field_str(buffer, field_name, field_type.of_type, converter, isnull=False)
-        elif isinstance(field_type, GraphQLList) and not self.is_scalar_type(field_type):
+        elif isinstance(field_type, GraphQLList):  # and not self.is_scalar_type(field_type):
             item_assign = self.get_assign_field_str(
                 buffer, f"{field_name}__iter", field_type.of_type, converter
             )
@@ -312,11 +330,12 @@ class Renderer:
         converter: Callable[[str], str],
         isnull=True,
     ):
+
         if isinstance(field_type, NonNullTypeNode):
             return self.get_assign_field_str_type_node(
                 buffer, field_name, field_type.type, converter, isnull=False
             )
-        elif isinstance(field_type, ListTypeNode) and not self.is_scalar_type_from_node_type(field_type):
+        elif isinstance(field_type, ListTypeNode):  # and not self.is_scalar_type_from_node_type(field_type):
             item_assign = self.get_assign_field_str_type_node(
                 buffer, f"{field_name}__iter", field_type.type, converter
             )

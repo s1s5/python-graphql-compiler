@@ -78,6 +78,10 @@ def get_parsed_query(query_str: str, schema_str: Optional[str] = None) -> Parsed
             a4(x: String): String
             a5(x: MyScalar!): String
             a6(x: MyScalar): String
+            a70(x: [MyScalar]): String
+            a71(x: [MyScalar!]): String
+            a72(x: [MyScalar]!): String
+            a73(x: [MyScalar!]!): String
             b(a: AddInput!): String!
             hero: Character
         }
@@ -493,7 +497,7 @@ class Test(unittest.TestCase):
     def test_render_variable_type(self):
         parsed_query = get_parsed_query(
             """
-            query Q($id: ID!, $llll: [[[[String]]]], $v3: [[[[SubInput]]]], $v4: String, $v5: MyScalar!, $v6: MyScalar) {
+            query Q($id: ID!, $llll: [[[[String]]]], $v3: [[[[SubInput]]]], $v4: String, $v5: MyScalar!, $v6: MyScalar, $v70: [MyScalar], $v71: [MyScalar!], $v72: [MyScalar]!, $v73: [MyScalar!]!) {
                 a(id: $id) {
                     id name
                 }
@@ -506,6 +510,10 @@ class Test(unittest.TestCase):
                 a4(x: $v4)
                 a5(x: $v5)
                 a6(x: $v6)
+                a70(x: $v70)
+                a71(x: $v71)
+                a72(x: $v72)
+                a73(x: $v73)
             }
             """  # noqa
         )
@@ -525,8 +533,8 @@ class Test(unittest.TestCase):
             str(b).strip(),
             inspect.cleandoc(
                 """
-                V__required = typing.TypedDict("V__required", {"id": str, "v5": MyScalar})
-                V__not_required = typing.TypedDict("V__not_required", {"llll": typing.List[typing.List[typing.List[typing.List[typing.Optional[str]]]]], "v3": typing.List[typing.List[typing.List[typing.List[typing.Optional[SubInput]]]]], "v4": typing.Optional[str], "v6": typing.Optional[MyScalar]}, total=False)
+                V__required = typing.TypedDict("V__required", {"id": str, "v5": MyScalar, "v72": typing.List[typing.Optional[MyScalar]], "v73": typing.List[MyScalar]})
+                V__not_required = typing.TypedDict("V__not_required", {"llll": typing.List[typing.List[typing.List[typing.List[typing.Optional[str]]]]], "v3": typing.List[typing.List[typing.List[typing.List[typing.Optional[SubInput]]]]], "v4": typing.Optional[str], "v6": typing.Optional[MyScalar], "v70": typing.List[typing.Optional[MyScalar]], "v71": typing.List[MyScalar]}, total=False)
 
 
                 class V(V__required, V__not_required):
@@ -543,6 +551,16 @@ class Test(unittest.TestCase):
                     if v6 in data:
                         x = data["v6"]
                         ret["v6"] = MyScalar.serialize(x) if x else None
+                    if v70 in data:
+                        x = data["v70"]
+                        ret["v70"] = [MyScalar.serialize(x__iter) if x__iter else None for x__iter in x]
+                    if v71 in data:
+                        x = data["v71"]
+                        ret["v71"] = [MyScalar.serialize(x__iter) for x__iter in x]
+                    x = data["v72"]
+                    ret["v72"] = [MyScalar.serialize(x__iter) if x__iter else None for x__iter in x]
+                    x = data["v73"]
+                    ret["v73"] = [MyScalar.serialize(x__iter) for x__iter in x]
                     return ret
                 """  # noqa
             ),
