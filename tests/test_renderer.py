@@ -12,6 +12,7 @@ from python_graphql_compiler.parser import ParsedQuery, Parser
 def get_parsed_query(query_str: str, schema_str: Optional[str] = None) -> ParsedQuery:
     if schema_str is None:
         schema_str = """
+        scalar MyScalar
         enum Episode {
             NEWHOPE
             EMPIRE
@@ -23,6 +24,11 @@ def get_parsed_query(query_str: str, schema_str: Optional[str] = None) -> Parsed
         input AddInput {
             name: String!
             sub: SubInput
+        }
+        input ComplexInput {
+            a: [[AddInput]]!
+            b: [[SubInput!]] = []
+            c: MyScalar
         }
         type A {
             id: ID!
@@ -68,10 +74,16 @@ def get_parsed_query(query_str: str, schema_str: Optional[str] = None) -> Parsed
             hello: String!
             a(id: ID!): A
             a2(llll: [[[[String]]]]): A
+            a3(llll: [[[[SubInput]]]]): A
+            a4(x: String): String
+            a5(x: MyScalar!): String
+            a6(x: MyScalar): String
+            b(a: AddInput!): String!
             hero: Character
         }
         type Mutation {
             add(input: AddInput!): A
+            runComplex(input: ComplexInput!): A
         }
         type Subscription {
             count(target: Int!): String
@@ -87,6 +99,8 @@ def get_parsed_query(query_str: str, schema_str: Optional[str] = None) -> Parsed
 
 
 class Test(unittest.TestCase):
+    maxDiff = None
+
     def test_code_chunk(self):
         cc = renderer.CodeChunk()
         cc.write("a")
@@ -109,7 +123,8 @@ class Test(unittest.TestCase):
     def test_render(self):
         parsed_query = get_parsed_query(
             """
-            query Q {
+            query Q($input: AddInput!) {
+                b(a: $input)
                 hero {
                     __typename
                     name
@@ -131,7 +146,7 @@ class Test(unittest.TestCase):
             """
         )
 
-        r = renderer.Renderer()
+        r = renderer.Renderer(inherit=[{"import": "import", "inherit": "Hoge"}])
         r.render([parsed_query])
 
     def test_get_query_body(self):
@@ -212,10 +227,90 @@ class Test(unittest.TestCase):
 
                 def AddInput__serialize(data):
                     ret = copy.copy(data)
-                    x = data["sub"]
-                    ret["sub"] = AddInput__serialize(x) if x else None
+                    if "sub" in data:
+                        x = data["sub"]
+                        ret["sub"] = AddInput__serialize(x) if x else None
                     return ret
                 """  # noqa
+            ),
+        )
+
+    def test_render_input_complex(self):
+        parsed_query = get_parsed_query(
+            """
+            mutation M($input: ComplexInput!) {
+                runComplex(input: $input) {
+                    name
+                }
+            }
+            """
+        )
+        b = renderer.CodeChunk()
+        r = renderer.Renderer(
+            scalar_map={
+                "MyScalar": {
+                    "serializer": "MyScalar.serialize({value})",
+                    "python_type": "MyScalar",
+                }
+            }
+        )
+        r.render_input(b, "SubInput", parsed_query.used_input_types["SubInput"])
+        r.render_input(b, "AddInput", parsed_query.used_input_types["AddInput"])
+        r.render_input(b, "ComplexInput", parsed_query.used_input_types["ComplexInput"])
+
+        self.assertEqual(
+            str(b).strip(),
+            inspect.cleandoc(
+                """
+        SubInput__required = typing.TypedDict("SubInput__required", {})
+        SubInput__not_required = typing.TypedDict("SubInput__not_required", {"age": typing.Optional[int]}, total=False)
+
+
+        class SubInput(SubInput__required, SubInput__not_required):
+            pass
+
+
+        def SubInput__serialize(data):
+            ret = copy.copy(data)
+            return ret
+
+
+        AddInput__required = typing.TypedDict("AddInput__required", {"name": str})
+        AddInput__not_required = typing.TypedDict("AddInput__not_required", {"sub": typing.Optional[SubInput]}, total=False)
+
+
+        class AddInput(AddInput__required, AddInput__not_required):
+            pass
+
+
+        def AddInput__serialize(data):
+            ret = copy.copy(data)
+            if "sub" in data:
+                x = data["sub"]
+                ret["sub"] = AddInput__serialize(x) if x else None
+            return ret
+
+
+        ComplexInput__required = typing.TypedDict("ComplexInput__required", {"a": typing.List[typing.List[typing.Optional[AddInput]]]})
+        ComplexInput__not_required = typing.TypedDict("ComplexInput__not_required", {"b": typing.List[typing.List[SubInput]], "c": typing.Optional[MyScalar]}, total=False)
+
+
+        class ComplexInput(ComplexInput__required, ComplexInput__not_required):
+            pass
+
+
+        def ComplexInput__serialize(data):
+            ret = copy.copy(data)
+            x = data["a"]
+            ret["a"] = [[ComplexInput__serialize(x__iter__iter) if x__iter__iter else None for x__iter__iter in x__iter] for x__iter in x]
+            if "b" in data:
+                x = data["b"]
+                ret["b"] = [[ComplexInput__serialize(x__iter__iter) for x__iter__iter in x__iter] for x__iter in x]
+            if "c" in data:
+                x = data["c"]
+                ret["c"] = MyScalar.serialize(x) if x else None
+            return ret
+        """  # noqa
             ),
         )
 
@@ -398,18 +493,31 @@ class Test(unittest.TestCase):
     def test_render_variable_type(self):
         parsed_query = get_parsed_query(
             """
-            query Q($id: ID!, $llll: [[[[String]]]]) {
+            query Q($id: ID!, $llll: [[[[String]]]], $v3: [[[[SubInput]]]], $v4: String, $v5: MyScalar!, $v6: MyScalar) {
                 a(id: $id) {
                     id name
                 }
                 a2(llll: $llll) {
                     id name
                 }
+                a3(llll: $v3) {
+                    name
+                }
+                a4(x: $v4)
+                a5(x: $v5)
+                a6(x: $v6)
             }
-            """
+            """  # noqa
         )
 
-        r = renderer.Renderer()
+        r = renderer.Renderer(
+            scalar_map={
+                "MyScalar": {
+                    "serializer": "MyScalar.serialize({value})",
+                    "python_type": "MyScalar",
+                }
+            }
+        )
         b = renderer.CodeChunk()
         r.render_variable_type(b, "V", parsed_query.variable_map)
 
@@ -417,8 +525,8 @@ class Test(unittest.TestCase):
             str(b).strip(),
             inspect.cleandoc(
                 """
-                V__required = typing.TypedDict("V__required", {"id": str})
-                V__not_required = typing.TypedDict("V__not_required", {"llll": typing.List[typing.List[typing.List[typing.List[typing.Optional[str]]]]]}, total=False)
+                V__required = typing.TypedDict("V__required", {"id": str, "v5": MyScalar})
+                V__not_required = typing.TypedDict("V__not_required", {"llll": typing.List[typing.List[typing.List[typing.List[typing.Optional[str]]]]], "v3": typing.List[typing.List[typing.List[typing.List[typing.Optional[SubInput]]]]], "v4": typing.Optional[str], "v6": typing.Optional[MyScalar]}, total=False)
 
 
                 class V(V__required, V__not_required):
@@ -427,6 +535,14 @@ class Test(unittest.TestCase):
 
                 def V__serialize(data):
                     ret = copy.copy(data)
+                    if v3 in data:
+                        x = data["v3"]
+                        ret["v3"] = [[[[SubInput__serialize(x__iter__iter__iter__iter) if x__iter__iter__iter__iter else None for x__iter__iter__iter__iter in x__iter__iter__iter] for x__iter__iter__iter in x__iter__iter] for x__iter__iter in x__iter] for x__iter in x]
+                    x = data["v5"]
+                    ret["v5"] = MyScalar.serialize(x)
+                    if v6 in data:
+                        x = data["v6"]
+                        ret["v6"] = MyScalar.serialize(x) if x else None
                     return ret
                 """  # noqa
             ),

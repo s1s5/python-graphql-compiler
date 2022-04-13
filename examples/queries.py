@@ -46,15 +46,15 @@ def AddStarshipInput__serialize(data):
 @dataclass
 class GetObject__droid:
     _typename: typing.Literal["Droid"]
+    appearsIn: typing.List[Episode]
     id: str
     name: str
-    appearsIn: typing.List[Episode]
     primaryFunction: str
-    def __init__(self, _typename, id, name, appearsIn, primaryFunction):
+    def __init__(self, _typename, appearsIn, id, name, primaryFunction):
         self._typename = _typename
+        self.appearsIn = appearsIn
         self.id = id
         self.name = name
-        self.appearsIn = appearsIn
         self.primaryFunction = primaryFunction
 
 
@@ -155,14 +155,14 @@ class GetRecursive__hero__Droid__friends__Droid__friends:
 @dataclass
 class GetRecursive__hero__Droid__friends__Droid:
     _typename: typing.Literal["Droid"]
+    friends: typing.List[typing.Optional[GetRecursive__hero__Droid__friends__Droid__friends]]
     id: str
     name: str
-    friends: typing.List[typing.Optional[GetRecursive__hero__Droid__friends__Droid__friends]]
-    def __init__(self, _typename, id, name, friends):
+    def __init__(self, _typename, friends, id, name):
         self._typename = _typename
+        self.friends = [GetRecursive__hero__Droid__friends__Droid__friends(**friends__iter) if friends__iter else None for friends__iter in friends]
         self.id = id
         self.name = name
-        self.friends = [GetRecursive__hero__Droid__friends__Droid__friends(**friends__iter) if friends__iter else None for friends__iter in friends]
 
 
 @dataclass
@@ -197,18 +197,18 @@ class GetRecursive__hero__Droid__friends:
 @dataclass
 class GetRecursive__hero__Droid:
     _typename: typing.Literal["Droid"]
+    friends: typing.List[typing.Optional[GetRecursive__hero__Droid__friends]]
     name: str
     primaryFunction: str
-    friends: typing.List[typing.Optional[GetRecursive__hero__Droid__friends]]
-    def __init__(self, _typename, name, primaryFunction, friends):
+    def __init__(self, _typename, friends, name, primaryFunction):
         self._typename = _typename
-        self.name = name
-        self.primaryFunction = primaryFunction
         __friends_map = {
             "Human": GetRecursive__hero__Droid__friends__Human,
             "Droid": GetRecursive__hero__Droid__friends__Droid,
         }
         self.friends = [__friends_map.get(friends__iter["__typename"], GetRecursive__hero__Droid__friends)(**demangle(friends__iter, ['__typename'])) if friends__iter else None for friends__iter in friends]
+        self.name = name
+        self.primaryFunction = primaryFunction
 
 
 @dataclass
@@ -241,16 +241,16 @@ class GetRecursive__hero__Human__friends:
 @dataclass
 class GetRecursive__hero__Human:
     _typename: typing.Literal["Human"]
-    name: str
     friends: typing.List[typing.Optional[GetRecursive__hero__Human__friends]]
-    def __init__(self, _typename, name, friends):
+    name: str
+    def __init__(self, _typename, friends, name):
         self._typename = _typename
-        self.name = name
         __friends_map = {
             "Human": GetRecursive__hero__Human__friends__Human,
             "Droid": GetRecursive__hero__Human__friends__Droid,
         }
         self.friends = [__friends_map.get(friends__iter["__typename"], GetRecursive__hero__Human__friends)(**demangle(friends__iter, ['__typename'])) if friends__iter else None for friends__iter in friends]
+        self.name = name
 
 
 @dataclass

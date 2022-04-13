@@ -1,6 +1,8 @@
+import inspect
 import tempfile
 import unittest
 
+# from click.testing import CliRunner
 from graphql import build_ast_schema, parse
 
 from python_graphql_compiler import cli
@@ -43,3 +45,33 @@ class Test(unittest.TestCase):
         cli.run(schema, [query_file.name], config)
 
         # print(out_file.read().decode('utf-8'))
+
+    def test_extract_query_files(self):
+        # TODO
+        pass
+
+    def test_load_config_file(self):
+        with tempfile.NamedTemporaryFile() as config_file:
+            config_file.write(
+                inspect.cleandoc(
+                    """
+            inherit:
+              - inherit: "utils.Client[{Input}, {Response}]"
+                import: "import utils"
+            """
+                ).encode("utf-8")
+            )
+            config_file.flush()
+
+            config = cli.load_config_file(config_file.name)
+            self.assertEqual(
+                config["inherit"],
+                [{"inherit": "utils.Client[{Input}, {Response}]", "import": "import utils"}],
+            )
+
+    def test_main(self):
+        pass  # TODO
+        # runner = CliRunner()
+        # result = runner.invoke(cli.main, ["Peter"])
+        # assert result.exit_code == 0
+        # assert result.output == "Hello Peter!\n"

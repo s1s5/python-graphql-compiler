@@ -1,3 +1,4 @@
+import copy
 import glob
 import json
 import os
@@ -6,11 +7,16 @@ from collections import defaultdict
 from typing import Dict, List, Optional, Set
 
 import click
-import requests
+
+try:
+    import requests
+except ImportError:
+    pass
+
 import yaml
 
 from graphql import GraphQLSchema, build_ast_schema, get_introspection_query, validate
-from graphql.language import FragmentDefinitionNode, OperationDefinitionNode
+from graphql.language import OperationDefinitionNode
 from graphql.language.parser import parse
 from graphql.utilities.print_schema import print_schema
 from graphql.validation.rules.no_unused_fragments import NoUnusedFragmentsRule
@@ -68,7 +74,7 @@ def run(
     )
 
     operation_library: Dict[str, List[OperationDefinitionNode]] = defaultdict(list)
-    fragment_library: Dict[str, List[FragmentDefinitionNode]] = defaultdict(list)
+    # fragment_library: Dict[str, List[FragmentDefinitionNode]] = defaultdict(list)
 
     rules = [rule for rule in specified_rules if rule is not NoUnusedFragmentsRule]
     for filename in query_files:
@@ -81,9 +87,11 @@ def run(
             if isinstance(definition, OperationDefinitionNode):
                 assert definition.name
                 operation_library[filename].append(definition)
-            elif isinstance(definition, FragmentDefinitionNode):
-                assert definition.name
-                fragment_library[filename].append(definition)
+            else:
+                raise Exception("Unsupported type found")
+            # elif isinstance(definition, FragmentDefinitionNode):
+            #     assert definition.name
+            #     fragment_library[filename].append(definition)
 
     for filename, definition_list in operation_library.items():
         parsed_list = [query_parser.parse(definition) for definition in definition_list]
@@ -99,7 +107,7 @@ def run(
                 ext=ext,
             )
             os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-            with open(dst_path, "w") as fp:
+            with open(dst_path, "w", encoding="utf-8") as fp:
                 print(query_renderer.render(parsed_list), file=fp)
 
 
@@ -110,6 +118,9 @@ def compile_schema_library(schema_filepaths: Optional[List[str]]) -> GraphQLSche
     full_schema = ""
     for schema_filepath in schema_filepaths:
         if schema_filepath.startswith("http"):
+            if "requests" not in globals():
+                raise Exception('schema from network unsupported. install "requests"')
+
             res = requests.post(
                 schema_filepath,
                 headers={"Content-Type": "application/json"},
@@ -118,7 +129,7 @@ def compile_schema_library(schema_filepaths: Optional[List[str]]) -> GraphQLSche
             res.raise_for_status()
             full_schema = full_schema + print_schema(build_client_schema(res.json()["data"]))
         else:
-            with open(schema_filepath) as schema_file:
+            with open(schema_filepath, "r", encoding="utf-8") as schema_file:
                 full_schema = full_schema + schema_file.read()
 
     return build_ast_schema(parse(full_schema))
@@ -141,7 +152,7 @@ def extract_query_files(queries: Optional[List[str]], config: Config) -> List[st
 
 
 def load_config_file(config_file: Optional[str]) -> Config:
-    config = DEFAULT_CONFIG
+    config = copy.deepcopy(DEFAULT_CONFIG)
     if config_file:
         with open(config_file) as fp:
             config.update(yaml.safe_load(fp))
@@ -165,7 +176,7 @@ def load_config_file(config_file: Optional[str]) -> Config:
 )
 @click.option("-c", "--config", help="path where config yaml file", type=str)
 @click.version_option(python_graphql_compiler.__version__, "--version")
-def cli(
+def main(
     schema: List[str],
     query: List[str],
     config: Optional[str],
@@ -179,12 +190,3 @@ def cli(
         query_files=query_files,
         config=config_data,
     )
-
-
-def main():
-    # pylint: disable=no-value-for-parameter
-    cli()  # noqa
-
-
-if __name__ == "__main__":
-    main()

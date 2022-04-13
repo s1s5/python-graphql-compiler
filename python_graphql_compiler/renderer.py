@@ -92,10 +92,8 @@ class InlineFragmentAssignConverter:
     demangle: List[str]
 
     def __call__(self, varname: str) -> str:
-        if self.demangle:
-            arg = f"demangle({varname}, {self.demangle})"
-        else:
-            arg = varname
+        # inline fragmentは__typename必須
+        arg = f"demangle({varname}, {self.demangle})"
         return f'__{self.field_name}_map.get({varname}["__typename"]' + f", {self.field_type_str})(**{arg})"
 
 
@@ -388,7 +386,7 @@ class Renderer:
                 elif field_info.scalar_config:
                     converter = DefaultAssignConverter(field_info.scalar_config.get("deserializer"))
                 else:
-                    raise Exception("Unexpected Error")
+                    raise Exception("Unexpected Error")  # pragma: no cover
 
                 assign = self.get_assign_field_str(buffer, field_name, field_info.graphql_type, converter)
                 buffer.write(f"self.{field_name} = {assign}")
@@ -457,7 +455,7 @@ class Renderer:
         for key, pqv in input_type.fields.items():  # type: ignore
             type_: GraphQLOutputType = pqv.type  # type: ignore
             s = f'"{key}": {self.type_to_string(type_)}'
-            if bool(pqv.default_value) or (not isinstance(type_, GraphQLNonNull)):
+            if (pqv.default_value != Undefined) or (not isinstance(type_, GraphQLNonNull)):
                 nr.append(s)
             else:
                 r.append(s)
@@ -473,13 +471,13 @@ class Renderer:
                 scalar_config = self.get_scalar_config_from_type(type_)
                 if (not is_scalar) or scalar_config.get("serializer"):
                     if is_scalar:
-                        converter = DefaultAssignConverter(scalar_config.get("deserializer"))
+                        converter = DefaultAssignConverter(scalar_config.get("serializer"))
                     else:
                         converter = DefaultAssignConverter(f"{name}__serialize" + "({value})")
                     assign = self.get_assign_field_str(buffer, "x", type_, converter)
                     statement = f'ret["{key}"] = {assign}'
 
-                    if pqv.default_value != Undefined:
+                    if pqv.default_value != Undefined or (not isinstance(type_, GraphQLNonNull)):
                         with buffer.write_block(f'if "{key}" in data:'):
                             buffer.write(f'x = data["{key}"]')
                             buffer.write(statement)
@@ -511,7 +509,7 @@ class Renderer:
                 scalar_config = self.get_scalar_config_from_type_node(pqv.type_node)
                 if (not is_scalar) or scalar_config.get("serializer"):
                     if is_scalar:
-                        converter = DefaultAssignConverter(scalar_config.get("deserializer"))
+                        converter = DefaultAssignConverter(scalar_config.get("serializer"))
                     else:
                         converter = DefaultAssignConverter(
                             f'{scalar_config["python_type"]}__serialize' + "({value})"
