@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "python_graphql_compiler"
-version = "0.1.3"
+version = "0.1.4"
 description = "Python graphql compiler"
 license = "MIT"
 authors = ["Shogo Sawai <shogo.sawai+graphqlcompiler@gmail.com>"]

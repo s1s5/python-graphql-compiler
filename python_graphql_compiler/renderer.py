@@ -99,6 +99,7 @@ class InlineFragmentAssignConverter:
 
 class Renderer:
     scalar_map: Dict[str, ScalarConfig]
+    type_map: Dict[str, ParsedField]
     use_demangle: bool
 
     def __init__(
@@ -110,12 +111,14 @@ class Renderer:
         self.scalar_map.update(scalar_map)
         self.__extra_import: Set[str] = set()
         self.inherit = inherit
+        self.type_map = {}
         self.use_demangle = False
 
     def render(
         self,
         parsed_query_list: List[ParsedQuery],
     ) -> str:
+        self.type_map = {}
         self.use_demangle = False
 
         buffer = CodeChunk()
@@ -158,18 +161,7 @@ class Renderer:
         if wrote:
             buffer.insert(_start, ["", "", "#" * 80, "# input"])
 
-        _start, wrote = buffer.tell(), False
-        for query in parsed_query_list:
-            for class_name, class_info in reversed(query.type_map.items()):
-                if class_name not in rendered:
-                    if wrote:
-                        buffer.write("")
-                        buffer.write("")
-                    rendered.add(class_name)
-                    self.render_class(buffer, class_name, class_info, query)
-                    wrote = True
-        if wrote:
-            buffer.insert(_start, ["", "", "#" * 80, "# type"])
+        self.render_all_classes(buffer, parsed_query_list, rendered)
 
         for query in parsed_query_list:
             buffer.write("")
@@ -347,6 +339,21 @@ class Renderer:
             assign = f"{assign} if {field_name} else None"
         return assign
 
+    def render_all_classes(self, buffer: CodeChunk, parsed_query_list: List[ParsedQuery], rendered: Set[str]):
+        _start, wrote = buffer.tell(), False
+        for query in parsed_query_list:
+            for class_name, class_info in reversed(query.type_map.items()):
+                if class_name not in rendered:
+                    if wrote:
+                        buffer.write("")
+                        buffer.write("")
+                    rendered.add(class_name)
+                    self.type_map[class_name] = class_info
+                    self.render_class(buffer, class_name, class_info, query)
+                    wrote = True
+        if wrote:
+            buffer.insert(_start, ["", "", "#" * 80, "# type"])
+
     def render_class(
         self,
         buffer: CodeChunk,
@@ -448,6 +455,19 @@ class Renderer:
                 return s
             else:
                 return f"typing.List[{s}]"  # type: ignore
+        if type_.name in self.type_map:
+            if type_only:
+                return type_.name
+            if self.type_map[type_.name].inline_fragments:
+                name = (
+                    type_.name
+                    + " | "
+                    + " | ".join([f"{type_.name}__{x}" for x in self.type_map[type_.name].inline_fragments])
+                )
+            else:
+                name = type_.name
+            return f"typing.Optional[{name}]" if isnull else name
+
         type_name = self.scalar_map.get(type_.name, {"import": "", "python_type": type_.name})
         self.__extra_import.add(type_name.get("import") or "")
         if isnull and (not type_only):
