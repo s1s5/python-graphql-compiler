@@ -36,7 +36,7 @@ DEFAULT_SCALAR_CONFIG: Dict[str, ScalarConfig] = {
         "deserializer": "float({value})",
     },
     "String": {"python_type": "str"},
-    "Boolean": {"python_type": "str"},
+    "Boolean": {"python_type": "bool"},
     "ID": {"python_type": "str"},
 }
 
