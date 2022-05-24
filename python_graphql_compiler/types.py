@@ -1,6 +1,6 @@
 # pylint: disable=inherit-non-class, duplicate-bases
 
-from typing import Dict, List, TypedDict
+from typing import Dict, List, Literal, TypedDict
 
 ScalarConfig__required = TypedDict("ScalarConfig__required", {"python_type": str})
 ScalarConfig__not_required = TypedDict(
@@ -25,3 +25,4 @@ class Config(TypedDict, total=True):
     scalar_map: Dict[str, ScalarConfig]
     query_ext: str
     inherit: List[InheritConfig]
+    python_version: Literal["3.8", "3.9", "3.10"]

@@ -106,6 +106,7 @@ class Renderer:
         self,
         scalar_map: Dict[str, ScalarConfig] = {},
         inherit: List[InheritConfig] = [],
+        python_version: str = "3.10",
     ) -> None:
         self.scalar_map = copy.deepcopy(DEFAULT_SCALAR_CONFIG)
         self.scalar_map.update(scalar_map)
@@ -113,6 +114,11 @@ class Renderer:
         self.inherit = inherit
         self.type_map = {}
         self.use_demangle = False
+        self.python_version = tuple(int(x) for x in python_version.split(".")[:2])
+
+    @property
+    def use_typing_extensions(self):
+        return self.python_version < (3, 10)
 
     def render(
         self,
@@ -126,6 +132,9 @@ class Renderer:
         buffer.write("import copy")
         buffer.write("import inspect")
         buffer.write("import typing")
+
+        if self.use_typing_extensions:
+            buffer.write("import typing_extensions")
 
         buffer.write("from dataclasses import dataclass")
         inherit_imports = set(inherit["import"] for inherit in self.inherit if "import" in inherit)
@@ -180,8 +189,12 @@ class Renderer:
                 with buffer.write_block("_query = inspect.cleandoc('''"):
                     buffer.write_lines(self.get_query_body(query).splitlines())
                 buffer.write("''')")
-                buffer.write(f"Input: typing.TypeAlias = _{query.name}Input")
-                buffer.write(f"Response: typing.TypeAlias = {query.name}Response")
+
+                type_alias_module = "typing"
+                if self.use_typing_extensions:
+                    type_alias_module = "typing_extensions"
+                buffer.write(f"Input: {type_alias_module}.TypeAlias = _{query.name}Input")
+                buffer.write(f"Response: {type_alias_module}.TypeAlias = {query.name}Response")
 
                 self.write_serialize(buffer, query)
                 self.write_deserialize(buffer, query)

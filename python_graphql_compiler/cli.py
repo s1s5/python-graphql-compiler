@@ -59,6 +59,7 @@ DEFAULT_CONFIG: Config = {
     },
     "query_ext": "graphql",
     "inherit": [],
+    "python_version": "3.10",
 }
 
 
@@ -71,6 +72,7 @@ def run(
     query_renderer = Renderer(
         scalar_map=config["scalar_map"],
         inherit=config["inherit"],
+        python_version=config["python_version"],
     )
 
     operation_library: Dict[str, List[OperationDefinitionNode]] = defaultdict(list)

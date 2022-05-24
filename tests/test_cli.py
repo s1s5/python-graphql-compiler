@@ -40,6 +40,7 @@ class Test(unittest.TestCase):
             "scalar_map": {},
             "query_ext": "graphql",
             "inherit": [],
+            "python_version": "3.10",
         }
 
         cli.run(schema, [query_file.name], config)
