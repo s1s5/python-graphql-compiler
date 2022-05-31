@@ -233,7 +233,7 @@ class Test(unittest.TestCase):
                     ret = copy.copy(data)
                     if "sub" in data:
                         x = data["sub"]
-                        ret["sub"] = AddInput__serialize(x) if x else None
+                        ret["sub"] = SubInput__serialize(x) if x else None
                     return ret
                 """  # noqa
             ),
@@ -291,7 +291,7 @@ class Test(unittest.TestCase):
             ret = copy.copy(data)
             if "sub" in data:
                 x = data["sub"]
-                ret["sub"] = AddInput__serialize(x) if x else None
+                ret["sub"] = SubInput__serialize(x) if x else None
             return ret
 
 
@@ -306,10 +306,10 @@ class Test(unittest.TestCase):
         def ComplexInput__serialize(data):
             ret = copy.copy(data)
             x = data["a"]
-            ret["a"] = [[ComplexInput__serialize(x__iter__iter) if x__iter__iter else None for x__iter__iter in x__iter] for x__iter in x]
+            ret["a"] = [[AddInput__serialize(x__iter__iter) if x__iter__iter else None for x__iter__iter in x__iter] for x__iter in x]
             if "b" in data:
                 x = data["b"]
-                ret["b"] = [[ComplexInput__serialize(x__iter__iter) for x__iter__iter in x__iter] for x__iter in x]
+                ret["b"] = [[SubInput__serialize(x__iter__iter) for x__iter__iter in x__iter] for x__iter in x]
             if "c" in data:
                 x = data["c"]
                 ret["c"] = MyScalar.serialize(x) if x else None

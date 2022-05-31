@@ -525,7 +525,9 @@ class Renderer:
                     if is_scalar:
                         converter = DefaultAssignConverter(scalar_config.get("serializer"))
                     else:
-                        converter = DefaultAssignConverter(f"{name}__serialize" + "({value})")
+                        converter = DefaultAssignConverter(
+                            f"{self.type_to_string(type_, type_only=True)}__serialize" + "({value})"
+                        )
                     assign = self.get_assign_field_str(buffer, "x", type_, converter)
                     statement = f'ret["{key}"] = {assign}'
 
