@@ -472,11 +472,11 @@ class Renderer:
             if type_only:
                 return type_.name
             if self.type_map[type_.name].inline_fragments:
-                name = (
-                    type_.name
-                    + " | "
-                    + " | ".join([f"{type_.name}__{x}" for x in self.type_map[type_.name].inline_fragments])
-                )
+                type_list = [f"{type_.name}__{x}" for x in self.type_map[type_.name].inline_fragments]
+                if self.python_version < (3, 10):
+                    name = f"typing.Union[{type_.name}, " + ", ".join(type_list) + "]"
+                else:
+                    name = type_.name + " | " + " | ".join(type_list)
             else:
                 name = type_.name
             return f"typing.Optional[{name}]" if isnull else name

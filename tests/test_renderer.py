@@ -504,6 +504,27 @@ class Test(unittest.TestCase):
             ),
         )
 
+        b = renderer.CodeChunk()
+        r.python_version = (3, 8)
+        r.render_class(b, "Q__a", parsed_query.type_map["Q__a"], parsed_query)
+        self.assertEqual(
+            str(b).strip(),
+            inspect.cleandoc(
+                """
+                @dataclass
+                class Q__a:
+                    r: typing.Optional[typing.Union[Q__a__r, Q__a__r__Human, Q__a__r__Droid, Q__a__r__Starship]]
+                    def __init__(self, r):
+                        __r_map = {
+                            "Human": Q__a__r__Human,
+                            "Droid": Q__a__r__Droid,
+                            "Starship": Q__a__r__Starship,
+                        }
+                        self.r = __r_map.get(r["__typename"], Q__a__r)(**demangle(r, ['__typename'])) if r else None
+            """  # noqa
+            ),
+        )
+
     def test_type_to_string(self):
         parsed_query = get_parsed_query(
             """

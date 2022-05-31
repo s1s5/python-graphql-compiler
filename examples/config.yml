@@ -1,3 +1,4 @@
 inherit:
   - inherit: "utils.Client[{Input}, {Response}]"
     import: "import utils"
+python_version: "3.8"
