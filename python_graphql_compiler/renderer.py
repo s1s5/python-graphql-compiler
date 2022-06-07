@@ -493,7 +493,7 @@ class Renderer:
                 return type_.name
             if self.type_map[type_.name].inline_fragments:
                 cover_all_types = False
-                _type = self.type_map[type_.name].type
+                _type = strip_output_type_attribute(self.type_map[type_.name].type)
                 if isinstance(_type, GraphQLUnionType):
                     cover_all_types = len(_type.types) == len(
                         self.type_map[type_.name].inline_fragments.keys()
