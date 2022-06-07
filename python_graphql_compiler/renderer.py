@@ -137,9 +137,20 @@ class Renderer:
             buffer.write("import typing_extensions")
 
         buffer.write("from dataclasses import dataclass")
-        inherit_imports = set(inherit["import"] for inherit in self.inherit if "import" in inherit)
+        inherit_imports = set()
+        for inherit in self.inherit:
+            if not inherit.get("import"):
+                continue
+            ims = inherit["import"]
+            if isinstance(ims, str):
+                inherit_imports.add(ims)
+            else:
+                for i in ims:
+                    buffer.write(i)
+
         for im in inherit_imports:
             buffer.write(im)
+
         inherits_base = ", ".join([inherit["inherit"] for inherit in self.inherit])
 
         import_pos = buffer.tell()
@@ -454,6 +465,14 @@ class Renderer:
             }
         raise Exception("Unknown type node")  # pragma: no cover
 
+    def _add_extra_import(self, type_name: ScalarConfig):
+        im = type_name.get("import") or ""
+        if isinstance(im, str):
+            self.__extra_import.add(im)
+        else:
+            for i in im:
+                self.__extra_import.add(i)
+
     def type_to_string(
         self,
         type_: GraphQLOutputType,
@@ -482,7 +501,7 @@ class Renderer:
             return f"typing.Optional[{name}]" if isnull else name
 
         type_name = self.scalar_map.get(type_.name, {"import": "", "python_type": type_.name})
-        self.__extra_import.add(type_name.get("import") or "")
+        self._add_extra_import(type_name)
         if isnull and (not type_only):
             return f"typing.Optional[{type_name['python_type']}]"
         return type_name["python_type"]
@@ -494,7 +513,7 @@ class Renderer:
             return self.type_node_to_string(node.type, isnull=False)
         elif isinstance(node, NamedTypeNode):
             type_name = self.scalar_map.get(node.name.value, {"import": "", "python_type": node.name.value})
-            self.__extra_import.add(type_name.get("import") or "")
+            self._add_extra_import(type_name)
             if isnull:
                 return f"typing.Optional[{type_name['python_type']}]"
             return type_name["python_type"]
