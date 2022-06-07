@@ -153,9 +153,9 @@ def extract_query_files(queries: Optional[List[str]], config: Config) -> List[st
     return list(results)
 
 
-def load_config_file(config_file: Optional[str]) -> Config:
+def load_config_file(config_file_list: List[str]) -> Config:
     config = copy.deepcopy(DEFAULT_CONFIG)
-    if config_file:
+    for config_file in config_file_list:
         with open(config_file) as fp:
             config.update(yaml.safe_load(fp))
     return config
@@ -176,12 +176,12 @@ def load_config_file(config_file: Optional[str]) -> Config:
     type=str,
     multiple=True,
 )
-@click.option("-c", "--config", help="path where config yaml file", type=str)
+@click.option("-c", "--config", help="path where config yaml file", type=str, multiple=True)
 @click.version_option(python_graphql_compiler.__version__, "--version")
 def main(
     schema: List[str],
     query: List[str],
-    config: Optional[str],
+    config: List[str],
 ):
     compiled_schema = compile_schema_library(schema)
     config_data = load_config_file(config)

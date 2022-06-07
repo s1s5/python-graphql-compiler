@@ -64,7 +64,7 @@ class Test(unittest.TestCase):
             )
             config_file.flush()
 
-            config = cli.load_config_file(config_file.name)
+            config = cli.load_config_file([config_file.name])
             self.assertEqual(
                 config["inherit"],
                 [{"inherit": "utils.Client[{Input}, {Response}]", "import": "import utils"}],
