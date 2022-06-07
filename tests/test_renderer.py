@@ -492,7 +492,7 @@ class Test(unittest.TestCase):
                 """
                 @dataclass
                 class Q__a:
-                    r: typing.Optional[Q__a__r | Q__a__r__Human | Q__a__r__Droid | Q__a__r__Starship]
+                    r: typing.Optional[Q__a__r__Human | Q__a__r__Droid | Q__a__r__Starship]
                     def __init__(self, r):
                         __r_map = {
                             "Human": Q__a__r__Human,
@@ -513,12 +513,75 @@ class Test(unittest.TestCase):
                 """
                 @dataclass
                 class Q__a:
-                    r: typing.Optional[typing.Union[Q__a__r, Q__a__r__Human, Q__a__r__Droid, Q__a__r__Starship]]
+                    r: typing.Optional[typing.Union[Q__a__r__Human, Q__a__r__Droid, Q__a__r__Starship]]
                     def __init__(self, r):
                         __r_map = {
                             "Human": Q__a__r__Human,
                             "Droid": Q__a__r__Droid,
                             "Starship": Q__a__r__Starship,
+                        }
+                        self.r = __r_map.get(r["__typename"], Q__a__r)(**demangle(r, ['__typename'])) if r else None
+            """  # noqa
+            ),
+        )
+
+    def test_render_class_union_2(self):
+        parsed_query = get_parsed_query(
+            """
+            query Q {
+                a(id: "foo") {
+                    r {
+                        __typename
+                        ... on Human {
+                            name
+                        }
+                    }
+                }
+            }
+            """
+        )
+
+        r = renderer.Renderer()
+        b = renderer.CodeChunk()
+        r.render_all_classes(b, [parsed_query], set())
+        b = renderer.CodeChunk()
+        # r.render([parsed_query])
+        # r.render_class(b, "Hero", parsed_query.fields["hero"], parsed_query)
+        r.render_class(b, "Q__a", parsed_query.type_map["Q__a"], parsed_query)
+        # for class_name, class_info in reversed(parsed_query.type_map.items()):
+        #     b.write("")
+        #     b.write("")
+        #     r.render_class(b, class_name, class_info, parsed_query)
+        # print(str(b).strip())
+        self.assertEqual(
+            str(b).strip(),
+            inspect.cleandoc(
+                """
+                @dataclass
+                class Q__a:
+                    r: typing.Optional[Q__a__r | Q__a__r__Human]
+                    def __init__(self, r):
+                        __r_map = {
+                            "Human": Q__a__r__Human,
+                        }
+                        self.r = __r_map.get(r["__typename"], Q__a__r)(**demangle(r, ['__typename'])) if r else None
+            """  # noqa
+            ),
+        )
+
+        b = renderer.CodeChunk()
+        r.python_version = (3, 8)
+        r.render_class(b, "Q__a", parsed_query.type_map["Q__a"], parsed_query)
+        self.assertEqual(
+            str(b).strip(),
+            inspect.cleandoc(
+                """
+                @dataclass
+                class Q__a:
+                    r: typing.Optional[typing.Union[Q__a__r, Q__a__r__Human]]
+                    def __init__(self, r):
+                        __r_map = {
+                            "Human": Q__a__r__Human,
                         }
                         self.r = __r_map.get(r["__typename"], Q__a__r)(**demangle(r, ['__typename'])) if r else None
             """  # noqa

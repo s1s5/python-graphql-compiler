@@ -11,6 +11,7 @@ from graphql import (
     GraphQLInputObjectType,
     GraphQLList,
     GraphQLNonNull,
+    GraphQLUnionType,
     ListTypeNode,
     NamedTypeNode,
     NonNullTypeNode,
@@ -491,11 +492,24 @@ class Renderer:
             if type_only:
                 return type_.name
             if self.type_map[type_.name].inline_fragments:
+                cover_all_types = False
+                _type = self.type_map[type_.name].type
+                if isinstance(_type, GraphQLUnionType):
+                    cover_all_types = len(_type.types) == len(
+                        self.type_map[type_.name].inline_fragments.keys()
+                    )
+
                 type_list = [f"{type_.name}__{x}" for x in self.type_map[type_.name].inline_fragments]
                 if self.python_version < (3, 10):
-                    name = f"typing.Union[{type_.name}, " + ", ".join(type_list) + "]"
+                    if cover_all_types:
+                        name = "typing.Union[" + ", ".join(type_list) + "]"
+                    else:
+                        name = f"typing.Union[{type_.name}, " + ", ".join(type_list) + "]"
                 else:
-                    name = type_.name + " | " + " | ".join(type_list)
+                    if cover_all_types:
+                        name = " | ".join(type_list)
+                    else:
+                        name = type_.name + " | " + " | ".join(type_list)
             else:
                 name = type_.name
             return f"typing.Optional[{name}]" if isnull else name
