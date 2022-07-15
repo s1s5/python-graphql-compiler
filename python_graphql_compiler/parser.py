@@ -1,4 +1,5 @@
 import copy
+
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Union
@@ -88,9 +89,7 @@ NodeT = Union[ParsedField, ParsedQuery]
 
 
 class FieldToTypeMatcherVisitor(Visitor):
-    def __init__(
-        self, schema: GraphQLSchema, type_info: TypeInfo, query: OperationDefinitionNode
-    ):
+    def __init__(self, schema: GraphQLSchema, type_info: TypeInfo, query: OperationDefinitionNode):
         super().__init__()
         self.schema = schema
         self.type_info = type_info
@@ -111,6 +110,8 @@ class FieldToTypeMatcherVisitor(Visitor):
     def register_input_type_recursive(self, name: str):
         scalar_type = self.schema.type_map[name]
         if isinstance(scalar_type, GraphQLInputObjectType):
+            if name in self.parsed.used_input_types:  # move to last
+                self.parsed.used_input_types.pop(name)
             self.parsed.used_input_types[name] = scalar_type
             for field_type in scalar_type.fields.values():  # type: ignore
                 field_type = strip_output_type_attribute(field_type.type)
@@ -193,9 +194,7 @@ class FieldToTypeMatcherVisitor(Visitor):
             (GraphQLObjectType, GraphQLInterfaceType, GraphQLUnionType),
         ):
             type_name = "__".join([x.name for x in self.dfs_path] + [name])
-            self.parsed.type_name_mapping[type_name] = self.get_available_typename(
-                stripped_type_info
-            )
+            self.parsed.type_name_mapping[type_name] = self.get_available_typename(stripped_type_info)
             stripped_type_info.name = type_name
             self.parsed.type_map[type_name] = field
 
@@ -231,9 +230,7 @@ class FieldToTypeMatcherVisitor(Visitor):
             (GraphQLObjectType, GraphQLInterfaceType, GraphQLUnionType),
         ):
             type_name = "__".join([x.name for x in self.dfs_path] + [name])
-            self.parsed.type_name_mapping[type_name] = self.get_available_typename(
-                stripped_type_info
-            )
+            self.parsed.type_name_mapping[type_name] = self.get_available_typename(stripped_type_info)
             stripped_type_info.name = type_name
             self.parsed.type_map[type_name] = field
         elif isinstance(stripped_type_info, GraphQLEnumType):
@@ -245,10 +242,7 @@ class FieldToTypeMatcherVisitor(Visitor):
 
     def leave_field(self, node: FieldNode, *_):
         if isinstance(self.current, ParsedField):
-            if (
-                self.current.inline_fragments
-                and "__typename" not in self.current.fields
-            ):
+            if self.current.inline_fragments and "__typename" not in self.current.fields:
                 raise Exception("must add field '__typename' in inline fragment")
         self.pop()
         return node

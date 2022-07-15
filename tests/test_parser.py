@@ -10,11 +10,14 @@ from graphql import (
     NamedTypeNode,
     NonNullTypeNode,
     OperationDefinitionNode,
+    TypeInfo,
+    TypeInfoVisitor,
     build_ast_schema,
+    visit,
 )
 from graphql.language.parser import parse
 
-from python_graphql_compiler.parser import ParsedField, ParsedQuery, Parser
+from python_graphql_compiler.parser import FieldToTypeMatcherVisitor, ParsedField, ParsedQuery, Parser
 
 
 class Test(unittest.TestCase):
@@ -402,3 +405,36 @@ class Test(unittest.TestCase):
         parser = Parser(schema)
         with self.assertRaises(Exception):
             parser.parse(query)
+
+    def test_register_input_type_recursive(self):
+        schema_str = """
+        input A {
+            c: [C]
+        }
+        input B {
+            c: [C]
+        }
+        input C {
+            id: String!
+        }
+        type Query {
+            a(value: [A]): String!
+            b(value: [B]): String!
+        }
+        """
+        query_str = """
+        query Q($value: [A], $valueB: [B]) {
+            a(value: $value)
+            b(value: $valueB)
+        }
+        """
+        schema = build_ast_schema(parse(schema_str))
+        type_info = TypeInfo(schema)
+        parsed_query = parse(query_str)
+        query = parsed_query.definitions[0]
+        assert isinstance(query, OperationDefinitionNode)
+        visitor = FieldToTypeMatcherVisitor(schema, type_info, query)
+
+        visit(query, TypeInfoVisitor(type_info, visitor))
+
+        self.assertEqual(list(reversed(visitor.parsed.used_input_types.keys())), ["C", "B", "A"])
