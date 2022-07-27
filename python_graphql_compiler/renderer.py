@@ -617,7 +617,7 @@ class Renderer:
         buffer.write("@classmethod")
         with buffer.write_block(f"def serialize(cls, data: _{query.name}Input):"):
             with buffer.write_block("return {"):
-                buffer.write(f'"operation_name": "{query.name}",')
+                buffer.write(f'"operationName": "{query.name}",')
                 buffer.write('"query": cls._query,')
                 buffer.write(f'"variables": _{query.name}Input__serialize(data),')
             buffer.write("}")
