@@ -90,8 +90,113 @@ Python graphql compiler
 
 Features
 --------
+Generate type information from graphql queries.
 
-* TODO
+.. code-block:: text
+
+    query GetObject($id: ID!) {
+      droid(id: $id) {
+        __typename
+        id name appearsIn primaryFunction
+      }
+    }
+
+.. code-block:: python
+
+    Episode = typing.Literal["NEWHOPE", "EMPIRE", "JEDI"]
+
+
+    @dataclass
+    class GetObject__droid:
+        _typename: typing.Literal["Droid"]
+        appearsIn: typing.List[Episode]
+        id: str
+        name: str
+        primaryFunction: str
+        def __init__(self, _typename, appearsIn, id, name, primaryFunction):
+            self._typename = _typename
+            self.appearsIn = appearsIn
+            self.id = id
+            self.name = name
+            self.primaryFunction = primaryFunction
+
+
+    @dataclass
+    class GetObjectResponse:
+        droid: GetObject__droid
+        def __init__(self, droid):
+            self.droid = GetObject__droid(**demangle(droid, ['__typename']))
+    
+    
+    _GetObjectInput__required = typing.TypedDict("_GetObjectInput__required", {"id": str})
+    _GetObjectInput__not_required = typing.TypedDict("_GetObjectInput__not_required", {}, total=False)
+    
+    
+    class _GetObjectInput(_GetObjectInput__required, _GetObjectInput__not_required):
+        pass
+    
+    
+    def _GetObjectInput__serialize(data):
+        ret = copy.copy(data)
+        return ret
+    
+    
+    class GetObject(utils.Client[_GetObjectInput, GetObjectResponse]):
+        _query = inspect.cleandoc('''
+            query GetObject($id: ID!) {
+              droid(id: $id) {
+                __typename
+                id name appearsIn primaryFunction
+              }
+            }
+        ''')
+        Input: typing.TypeAlias = _GetObjectInput
+        Response: typing.TypeAlias = GetObjectResponse
+    
+        @classmethod
+        def serialize(cls, data: _GetObjectInput):
+            return {
+                "operation_name": "GetObject",
+                "query": cls._query,
+                "variables": _GetObjectInput__serialize(data),
+            }
+    
+        @classmethod
+        def deserialize(cls, data):
+            return cls.Response(**data)
+
+Usage
+-------
+.. code-block:: console
+
+    $ python -m python_graphql_compiler --help
+    Usage: python -m python_graphql_compiler [OPTIONS]
+    
+    Options:
+      -s, --schema TEXT  the graphql schemas storage path or url
+      -q, --query TEXT   path where query file or directory all queries files are
+                         stored
+      -c, --config TEXT  path where config yaml file
+      --version          Show the version and exit.
+      --help             Show this message and exit.
+
+    $ python -m python_graphql_compiler -s baseschema.graphql -s schema.grpahql -q query0.graphql -q query1.graphql -c config.yml
+
+
+config
+-------
+.. code-block:: yaml
+    scalar_map:
+      DateTime:
+          import: "import datetime"
+          python_type: "datetime.datetime"
+          serializer: "{value}.isoformat()"
+          deserializer: "datetime.datetime.fromisoformat({value})"
+   inherit:
+     - inherit: "utils.Client[{Input}, {Response}]"
+       import: "import utils"
+   python_version: "3.10"
+
 
 Install
 -------
@@ -100,16 +205,11 @@ Use ``pip`` for install:
 
 .. code-block:: console
 
-    $ pip install python_graphql_compiler
+    $ pip install git+https://github.com/s1s5/python-graphql-compiler.git
 
 If you want to setup a development environment, use ``poetry`` instead:
 
 .. code-block:: console
-
-    $ # Install poetry using pipx
-    $ python -m pip install pipx
-    $ python -m pipx ensurepath
-    $ pipx install poetry
 
     $ # Clone repository
     $ git clone https://github.com/s1s5/python-graphql-compiler.git
