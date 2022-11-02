@@ -187,12 +187,12 @@ config
 -------
 .. code-block:: yaml
 
-    scalar_map:
-      DateTime:
-          import: "import datetime"
-          python_type: "datetime.datetime"
-          serializer: "{value}.isoformat()"
-          deserializer: "datetime.datetime.fromisoformat({value})"
+   scalar_map:
+     DateTime:
+         import: "import datetime"
+         python_type: "datetime.datetime"
+         serializer: "{value}.isoformat()"
+         deserializer: "datetime.datetime.fromisoformat({value})"
    inherit:
      - inherit: "utils.Client[{Input}, {Response}]"
        import: "import utils"
