@@ -186,6 +186,7 @@ Usage
 config
 -------
 .. code-block:: yaml
+
     scalar_map:
       DateTime:
           import: "import datetime"
