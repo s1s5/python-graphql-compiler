@@ -1,3 +1,4 @@
+import collections.abc
 import copy
 import glob
 import json
@@ -61,6 +62,15 @@ DEFAULT_CONFIG: Config = {
     "inherit": [],
     "python_version": "3.10",
 }
+
+
+def _dict_update(d, u):
+    for k, v in u.items():
+        if isinstance(v, collections.abc.Mapping):
+            d[k] = _dict_update(d.get(k, {}), v)
+        else:
+            d[k] = v
+    return d
 
 
 def run(
@@ -157,7 +167,7 @@ def load_config_file(config_file_list: List[str]) -> Config:
     config = copy.deepcopy(DEFAULT_CONFIG)
     for config_file in config_file_list:
         with open(config_file) as fp:
-            config.update(yaml.safe_load(fp))
+            _dict_update(config, yaml.safe_load(fp))
     return config
 
 
