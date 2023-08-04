@@ -318,6 +318,20 @@ class Test(unittest.TestCase):
             ),
         )
 
+    def test_render_raise_exception(self):
+        parsed_query = get_parsed_query(
+            """
+            mutation M($input: ComplexInput!) {
+                runComplex(input: $input) {
+                    name
+                }
+            }
+            """
+        )
+        r = renderer.Renderer()
+        with self.assertRaises(Exception):
+            r.render([parsed_query])
+
     def test_get_field_type_mapping(self):
         parsed_query = get_parsed_query(
             """

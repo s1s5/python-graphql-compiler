@@ -78,7 +78,6 @@ class ObjectAssignConverter:
     demangle: List[str]
 
     def __call__(self, varname: str) -> str:
-
         if self.demangle:
             arg = f"demangle({varname}, {self.demangle})"
         else:
@@ -160,6 +159,11 @@ class Renderer:
 
         _start, wrote = buffer.tell(), False
         for query in parsed_query_list:
+            if query.used_scalars - set(self.scalar_map.keys()):
+                raise Exception(
+                    "Serializer/Deserializer not specified for ScalarType "
+                    f"'{query.used_scalars - set(self.scalar_map.keys())}'"
+                )
             for enum_name, enum_type in query.used_enums.items():
                 if enum_name not in rendered:
                     rendered.add(enum_name)
@@ -347,7 +351,6 @@ class Renderer:
         converter: Callable[[str], str],
         isnull=True,
     ):
-
         if isinstance(field_type, NonNullTypeNode):
             return self.get_assign_field_str_type_node(
                 buffer, field_name, field_type.type, converter, isnull=False
