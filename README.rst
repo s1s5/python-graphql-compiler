@@ -93,7 +93,7 @@ Features
 Generate type information from graphql queries.
 
 .. code-block:: text
-    # queries.graphql
+
     query GetObject($id: ID!) {
       droid(id: $id) {
         __typename
@@ -103,7 +103,7 @@ Generate type information from graphql queries.
 
 
 .. code-block:: python
-    # queries.py
+
     Episode = typing.Literal["NEWHOPE", "EMPIRE", "JEDI"]
 
 
@@ -167,7 +167,7 @@ Generate type information from graphql queries.
             return cls.Response(**data)
 
 .. code-block:: python
-    # utils.py
+
     "utility"
     import json
 
@@ -210,7 +210,6 @@ Generate type information from graphql queries.
                     return cls.deserialize(res_json["data"])
 
 .. code-block:: python
-    # Usage
     result = GetObject.execute("http://localhost:8000", {"id": "some-id"})
     assert isinstance(result, GetObject.Response)
 
