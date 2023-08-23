@@ -210,6 +210,7 @@ Generate type information from graphql queries.
                     return cls.deserialize(res_json["data"])
 
 .. code-block:: python
+
     result = GetObject.execute("http://localhost:8000", {"id": "some-id"})
     assert isinstance(result, GetObject.Response)
 
